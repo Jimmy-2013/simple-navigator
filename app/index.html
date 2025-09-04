@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的导航</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="favorites.ico" type="image/x-icon">
+</head>
+<body>
+    <div class="container">
+        <aside class="sidebar">
+            <h1>导航</h1>
+            <ul id="category-list">
+                <!-- 分类将由 JS 动态生成 -->
+            </ul>
+            <div class="sidebar-actions">
+                <button id="add-category-btn" class="btn">添加分类</button>
+                <button id="add-bookmark-btn" class="btn">添加书签</button>
+            </div>
+            <div class="settings">
+                <label>
+                    <input type="checkbox" id="toggle-categories" checked>
+                    <span>只显示当前分类</span>
+                </label>
+                <div class="data-actions">
+                    <button id="import-data-btn" class="btn btn-secondary">导入备份</button>
+                    <button id="backup-data-btn" class="btn btn-secondary">备份数据</button>
+                </div>
+            </div>
+        </aside>
+        <main class="main-content">
+            <div class="search-container">
+                <form action="https://www.google.com/search" method="get" target="_blank">
+                    <input type="text" name="q" class="search-input" placeholder="使用 Google 搜索..." autofocus>
+                    <button type="submit" class="search-button">搜索</button>
+                </form>
+            </div>
+            <div id="bookmark-grid" class="bookmark-grid">
+                <!-- 书签将由 JS 动态生成 -->
+            </div>
+        </main>
+    </div>
+
+    <div id="modal-overlay" class="modal-overlay hidden">
+        <div class="modal-content">
+            <h2 id="modal-title">添加</h2>
+            <form id="modal-form">
+                <input type="hidden" id="edit-item-id">
+                <input type="hidden" id="edit-item-category-id">
+                <div class="form-group" id="name-group">
+                    <label for="item-name">名称:</label>
+                    <input type="text" id="item-name" required>
+                </div>
+                <div class="form-group" id="url-group">
+                    <label for="item-url">URL:</label>
+                    <input type="url" id="item-url" required>
+                </div>
+                <div class="form-group" id="category-group">
+                    <label for="item-category">分类:</label>
+                    <select id="item-category" required></select>
+                </div>
+                <div class="modal-actions">
+                    <button type="submit" class="btn">保存</button>
+                    <button type="button" id="cancel-btn" class="btn btn-secondary">取消</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="Sortable.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

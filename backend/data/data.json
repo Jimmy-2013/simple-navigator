@@ -1,0 +1,20 @@
+{
+  "categories": [
+    {
+      "id": 1,
+      "name": "常用网站"
+    }
+  ],
+  "bookmarks": [
+    {
+      "id": 1756887774446,
+      "categoryId": 1756887745959,
+      "name": "google",
+      "url": "https://www.google.com//"
+    }
+  ],
+  "collapsedCategories": {
+    "1": false,
+    "2": false
+  }
+}

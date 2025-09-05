@@ -1,4 +1,4 @@
-document.addEventListener('DOMContentLoaded', async () => { // 注意这里的 async
+document.addEventListener('DOMContentLoaded', async () => {
     const categoryList = document.getElementById('category-list');
     const bookmarkGrid = document.getElementById('bookmark-grid');
     const addCategoryBtn = document.getElementById('add-category-btn');
@@ -17,9 +17,12 @@ document.addEventListener('DOMContentLoaded', async () => { // 注意这里的 a
     const toggleCategoriesCheckbox = document.getElementById('toggle-categories');
     const importDataBtn = document.getElementById('import-data-btn');
     const backupDataBtn = document.getElementById('backup-data-btn');
+    const allowDraggingCheckbox = document.getElementById('allow-dragging-categories');
+    // 新增：获取一键展开/收起按钮
+    const expandAllBtn = document.getElementById('expand-all-btn');
+    const collapseAllBtn = document.getElementById('collapse-all-btn');
 
-    // 后端 API 的基础 URL
-    const BACKEND_API_BASE_URL = '/api/data'; // Nginx 将 /api/data 代理到后端
+    const BACKEND_API_BASE_URL = '/api/data';
 
     let data = {
         categories: [],
@@ -27,9 +30,10 @@ document.addEventListener('DOMContentLoaded', async () => { // 注意这里的 a
         collapsedCategories: {}
     };
     let activeCategoryId = null;
-    let sortableInstances = {};
+    let sortableInstances = {}; // For bookmark groups
+    let categorySortableInstance = null; // For category list
+    let allowDraggingCategories = false; // 拖拽分类的开关状态，默认关闭
 
-    // 修改后的 loadData 函数，从后端加载数据
     async function loadData() {
         try {
             const response = await fetch(BACKEND_API_BASE_URL);
@@ -38,12 +42,11 @@ document.addEventListener('DOMContentLoaded', async () => { // 注意这里的 a
             }
             const backendData = await response.json();
             
-            // 确保后端返回的数据结构完整
             if (backendData && backendData.categories && backendData.bookmarks) {
                 data = { 
                     categories: backendData.categories,
                     bookmarks: backendData.bookmarks,
-                    collapsedCategories: backendData.collapsedCategories || {} // 确保 collapsedCategories 存在
+                    collapsedCategories: backendData.collapsedCategories || {}
                 };
             } else {
                 console.warn("Backend data is incomplete or empty, initializing default data.");
@@ -54,13 +57,36 @@ document.addEventListener('DOMContentLoaded', async () => { // 注意这里的 a
             initializeDefaultData();
         }
 
-        // 激活分类逻辑保持不变，但现在它将基于从后端加载的数据
-        // 尝试从 localStorage 加载 activeCategoryId，如果后端数据中没有，则使用默认值
         const savedActiveCategory = localStorage.getItem('activeCategoryId');
         if (savedActiveCategory && (savedActiveCategory === 'all' || data.categories.some(c => c.id == savedActiveCategory))) {
             activeCategoryId = savedActiveCategory === 'all' ? 'all' : parseInt(savedActiveCategory);
         } else {
             activeCategoryId = data.categories.length > 0 ? data.categories[0].id : 'all';
+        }
+
+        const savedAllowDragging = localStorage.getItem('allowDraggingCategories');
+        if (savedAllowDragging !== null) {
+            allowDraggingCategories = JSON.parse(savedAllowDragging);
+        }
+    }
+
+    async function saveData() {
+        try {
+            const response = await fetch(BACKEND_API_BASE_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            });
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            console.log('Data saved to backend successfully.');
+            localStorage.setItem('activeCategoryId', activeCategoryId);
+            localStorage.setItem('allowDraggingCategories', JSON.stringify(allowDraggingCategories));
+        } catch (error) {
+            console.error('Failed to save data to backend:', error);
         }
     }
 
@@ -79,39 +105,25 @@ document.addEventListener('DOMContentLoaded', async () => { // 注意这里的 a
         };
     }
 
-    // 修改后的 saveData 函数，保存数据到后端
-    async function saveData() {
-        try {
-            const response = await fetch(BACKEND_API_BASE_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(data)
-            });
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            console.log('Data saved to backend successfully.');
-            // 仍然在 localStorage 中保存 activeCategoryId，因为它只与当前用户界面状态相关
-            localStorage.setItem('activeCategoryId', activeCategoryId);
-        } catch (error) {
-            console.error('Failed to save data to backend:', error);
-            // 如果保存失败，可以考虑回退到 localStorage 或显示错误消息
-            // 为了简化，这里只打印错误，不回退
-        }
-    }
-
     function renderCategories() {
+        if (categorySortableInstance) {
+            categorySortableInstance.destroy();
+            categorySortableInstance = null;
+            console.log("Destroyed old categorySortableInstance.");
+        }
+
         categoryList.innerHTML = '';
+        allowDraggingCheckbox.checked = allowDraggingCategories;
+
         const allItem = document.createElement('li');
         allItem.textContent = '全部';
         allItem.dataset.id = 'all';
+        allItem.classList.add('all-category-item');
         if (activeCategoryId === 'all') {
             allItem.classList.add('active');
         }
         allItem.addEventListener('click', (e) => {
-            if (e.target === allItem) { //确保点击的不是按钮
+            if (e.target === allItem) {
                 activeCategoryId = 'all';
                 saveData();
                 render();
@@ -122,6 +134,9 @@ document.addEventListener('DOMContentLoaded', async () => { // 注意这里的 a
         data.categories.forEach(category => {
             const li = document.createElement('li');
             li.dataset.id = category.id;
+            if (allowDraggingCategories) {
+                li.classList.add('draggable-category-item');
+            }
             if (category.id == activeCategoryId) {
                 li.classList.add('active');
             }
@@ -140,15 +155,19 @@ document.addEventListener('DOMContentLoaded', async () => { // 注意这里的 a
 
             const editBtn = document.createElement('button');
             editBtn.className = 'category-edit-btn';
-            editBtn.innerHTML = '&#9998;'; // Pencil icon
+            editBtn.innerHTML = '&#9998;';
             editBtn.title = '编辑分类';
-            editBtn.onclick = () => openModal('editCategory', category);
+            editBtn.onclick = (e) => {
+                e.stopPropagation();
+                openModal('editCategory', category);
+            };
 
             const deleteBtn = document.createElement('button');
             deleteBtn.className = 'category-delete-btn';
-            deleteBtn.innerHTML = '&times;'; // X icon
+            deleteBtn.innerHTML = '&times;';
             deleteBtn.title = '删除分类';
-            deleteBtn.onclick = async () => { // 标记为 async
+            deleteBtn.onclick = async (e) => {
+                e.stopPropagation();
                 if (confirm(`确定要删除分类 "${category.name}" 吗？\n这将同时删除该分类下的所有书签！`)) {
                     const categoryId = category.id;
                     data.categories = data.categories.filter(c => c.id !== categoryId);
@@ -156,7 +175,7 @@ document.addEventListener('DOMContentLoaded', async () => { // 注意这里的 a
                     if (activeCategoryId === categoryId) {
                         activeCategoryId = 'all';
                     }
-                    await saveData(); // 等待保存完成
+                    await saveData();
                     render();
                 }
             };
@@ -167,6 +186,34 @@ document.addEventListener('DOMContentLoaded', async () => { // 注意这里的 a
             li.appendChild(controlsDiv);
             categoryList.appendChild(li);
         });
+
+        if (allowDraggingCategories) {
+            categorySortableInstance = new Sortable(categoryList, {
+                animation: 150,
+                ghostClass: 'sortable-ghost',
+                filter: '.all-category-item',
+                onMove: function (evt) {
+                    return !evt.related.classList.contains('all-category-item') && !evt.dragged.classList.contains('all-category-item');
+                },
+                onEnd: async function (evt) {
+                    console.log("Sortable onEnd event fired for categories.");
+                    const newOrderIds = Array.from(categoryList.children)
+                                           .filter(item => item.classList.contains('draggable-category-item'))
+                                           .map(item => parseInt(item.dataset.id));
+
+                    const newCategories = newOrderIds.map(id => data.categories.find(c => c.id === id));
+                    data.categories = newCategories.filter(Boolean);
+
+                    await saveData();
+                    console.log("Data saved to backend after category reorder.");
+                    render();
+                    console.log("UI re-rendered after category reorder.");
+                },
+            });
+            console.log("Category Sortable instance initialized.");
+        } else {
+            console.log("Category dragging is disabled, Sortable not initialized.");
+        }
     }
 
     function renderBookmarks() {
@@ -188,16 +235,17 @@ document.addEventListener('DOMContentLoaded', async () => { // 注意这里的 a
                     const bookmarkGroup = document.createElement('div');
                     bookmarkGroup.className = 'bookmark-group';
 
+                    // 根据 collapsedCategories 状态设置初始显示
                     if (data.collapsedCategories[category.id]) {
                         title.classList.add('collapsed');
                         bookmarkGroup.style.display = 'none';
                     }
 
-                    title.addEventListener('click', async () => { // 标记为 async
+                    title.addEventListener('click', async () => {
                         const isCollapsed = title.classList.toggle('collapsed');
                         bookmarkGroup.style.display = isCollapsed ? 'none' : 'grid';
                         data.collapsedCategories[category.id] = isCollapsed;
-                        await saveData(); // 等待保存完成
+                        await saveData();
                     });
 
                     bookmarkGrid.appendChild(title);
@@ -244,8 +292,9 @@ document.addEventListener('DOMContentLoaded', async () => { // 注意这里的 a
         nameSpan.textContent = bookmark.name;
 
         const editBtn = document.createElement('button');
-        editBtn.textContent = '编辑';
+        editBtn.innerHTML = '&#9998;';
         editBtn.className = 'edit-btn';
+        editBtn.title = '编辑书签';
         editBtn.onclick = (e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -253,14 +302,15 @@ document.addEventListener('DOMContentLoaded', async () => { // 注意这里的 a
         };
 
         const deleteBtn = document.createElement('button');
-        deleteBtn.textContent = '删除';
+        deleteBtn.innerHTML = '&times;';
         deleteBtn.className = 'delete-btn';
-        deleteBtn.onclick = async (e) => { // 标记为 async
+        deleteBtn.title = '删除书签';
+        deleteBtn.onclick = async (e) => {
             e.preventDefault();
             e.stopPropagation();
             if (confirm(`确定要删除书签 "${bookmark.name}" 吗？`)) {
                 data.bookmarks = data.bookmarks.filter(b => b.id !== bookmark.id);
-                await saveData(); // 等待保存完成
+                await saveData();
                 render();
             }
         };
@@ -277,17 +327,35 @@ document.addEventListener('DOMContentLoaded', async () => { // 注意这里的 a
             sortableInstances[categoryId] = new Sortable(element, {
                 animation: 150,
                 ghostClass: 'sortable-ghost',
-                onEnd: async function () { // 标记为 async
+                onEnd: async function () {
                     const newOrderIds = Array.from(element.children).map(item => parseInt(item.dataset.id));
                     const otherBookmarks = data.bookmarks.filter(b => b.categoryId != categoryId);
                     const newlySortedBookmarks = newOrderIds.map(id => {
                         return data.bookmarks.find(b => b.id === id);
                     });
                     data.bookmarks = [...otherBookmarks, ...newlySortedBookmarks];
-                    await saveData(); // 等待保存完成
+                    await saveData();
                 },
             });
         }
+    }
+
+    // 新增：一键展开所有分类
+    async function expandAllCategories() {
+        data.categories.forEach(category => {
+            data.collapsedCategories[category.id] = false;
+        });
+        await saveData();
+        render();
+    }
+
+    // 新增：一键收起所有分类
+    async function collapseAllCategories() {
+        data.categories.forEach(category => {
+            data.collapsedCategories[category.id] = true;
+        });
+        await saveData();
+        render();
     }
 
     function render() {
@@ -364,7 +432,7 @@ document.addEventListener('DOMContentLoaded', async () => { // 注意这里的 a
         });
     }
 
-    modalForm.addEventListener('submit', async (e) => { // 标记为 async
+    modalForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const type = modalForm.dataset.type;
         const name = itemNameInput.value.trim();
@@ -397,7 +465,7 @@ document.addEventListener('DOMContentLoaded', async () => { // 注意这里的 a
             }
         }
 
-        await saveData(); // 等待保存完成
+        await saveData();
         render();
         closeModal();
     });
@@ -409,6 +477,16 @@ document.addEventListener('DOMContentLoaded', async () => { // 注意这里的 a
         if (e.target === modalOverlay) closeModal();
     });
     toggleCategoriesCheckbox.addEventListener('change', renderBookmarks);
+
+    allowDraggingCheckbox.addEventListener('change', async () => {
+        allowDraggingCategories = allowDraggingCheckbox.checked;
+        await saveData();
+        render();
+    });
+
+    // 新增：为一键展开/收起按钮添加事件监听器
+    expandAllBtn.addEventListener('click', expandAllCategories);
+    collapseAllBtn.addEventListener('click', collapseAllCategories);
 
     backupDataBtn.addEventListener('click', () => {
         const dataStr = JSON.stringify(data, null, 2);
@@ -433,22 +511,26 @@ document.addEventListener('DOMContentLoaded', async () => { // 注意这里的 a
             const file = e.target.files[0];
             if (file) {
                 const reader = new FileReader();
-                reader.onload = async (event) => { // 标记为 async
+                reader.onload = async (event) => {
                     try {
                         const importedData = JSON.parse(event.target.result);
                         if (importedData.categories && importedData.bookmarks) {
                             if (confirm('这将覆盖您当前的所有数据，确定要导入吗？')) {
                                 data = { ...importedData, collapsedCategories: importedData.collapsedCategories || {} };
                                 activeCategoryId = data.categories.length > 0 ? data.categories[0].id : 'all';
-                                await saveData(); // 导入后立即保存到后端
+                                if (importedData.allowDraggingCategories !== undefined) {
+                                    allowDraggingCategories = importedData.allowDraggingCategories;
+                                }
+                                await saveData();
                                 render();
                                 alert('数据导入成功！');
                             }
                         } else {
                             alert('文件格式无效！');
                         }
-                    } catch (error) {
-                        alert('解析文件时出错，请确保文件是有效的 JSON 格式。');
+                    } catch (err) {
+                        alert('导入文件解析失败，请确保它是有效的 JSON 格式。');
+                        console.error('Error parsing imported data:', err);
                     }
                 };
                 reader.readAsText(file);
@@ -457,12 +539,11 @@ document.addEventListener('DOMContentLoaded', async () => { // 注意这里的 a
         fileInput.click();
     });
 
-    // 修复 updateToggleCategoriesCheckbox 函数，确保它能正确处理 undefined
-    function updateToggleCategoriesCheckbox() {
-        toggleCategoriesCheckbox.checked = !!data.collapsedCategories[activeCategoryId];
+    await loadData();
+    try {
+        render();
+    } catch (e) {
+        console.error("Error during initial render:", e);
+        alert("初始化页面时发生错误，请检查控制台。");
     }
-
-    // 初始加载数据和渲染
-    await loadData(); // 等待数据加载完成
-    render();
 });

@@ -54,12 +54,21 @@ body {
     padding: 12px 15px;
     margin-bottom: 8px;
     border-radius: 5px;
-    cursor: pointer;
+    cursor: default;
     transition: background-color 0.2s ease;
     display: flex;
     justify-content: space-between;
     align-items: center;
     position: relative;
+    font-size: 1em;
+}
+
+#category-list li.draggable-category-item {
+    cursor: grab;
+}
+
+#category-list li.all-category-item {
+    cursor: default;
 }
 
 #category-list li:hover {
@@ -76,7 +85,6 @@ body {
     flex-grow: 1;
 }
 
-/* --- 新增的分类控制按钮样式 --- */
 .category-item-controls {
     display: flex;
     align-items: center;
@@ -94,15 +102,24 @@ body {
     color: var(--sidebar-text);
     cursor: pointer;
     font-size: 16px;
-    padding: 0 5px;
-    line-height: 1;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 0;
+    border-radius: 5px;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.category-edit-btn:hover {
+    background-color: rgba(255, 255, 255, 0.2);
 }
 
 .category-delete-btn:hover {
-    color: var(--danger-color);
+    background-color: var(--danger-color);
+    color: white;
 }
-/* --- 分类控制按钮样式结束 --- */
-
 
 .sidebar-actions {
     display: flex;
@@ -113,13 +130,16 @@ body {
 .settings {
     border-top: 1px solid #4a627a;
     padding-top: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
 }
 
 .settings label {
     display: flex;
     align-items: center;
     cursor: pointer;
-    margin-bottom: 15px;
+    margin-bottom: 0;
 }
 
 .settings input[type="checkbox"] {
@@ -129,16 +149,38 @@ body {
 .data-actions {
     display: flex;
     gap: 10px;
+    margin-top: 10px;
 }
 
 .main-content {
     flex-grow: 1;
     padding: 30px;
     overflow-y: auto;
+    position: relative; /* 使 main-content 成为定位上下文 */
+}
+
+/* 调整：一键展开/收起按钮区域样式 */
+#header-actions {
+    display: flex;
+    flex-direction: column; /* 垂直排列 */
+    align-items: flex-end; /* 按钮靠右对齐 */
+    gap: 5px; /* 重新添加并加大按钮之间的垂直间距  hzj gap: 15px;      */
+    position: absolute; /* 绝对定位 */
+    top: 10px; /* 距离顶部 20px hzj top: 20px;*/
+    right: 20px; /* 距离右侧 20px */
+    z-index: 10; /* 确保按钮在其他内容之上 */
+}
+
+#header-actions .btn {
+    width: 95px; /* 设置固定宽度，与导入/备份按钮宽度一致 */
+    flex-grow: 0; /* 覆盖 .btn 的 flex-grow: 1 */
+    padding: 6px 10px; /* 调整垂直 padding 为 6px，水平 padding 保持 10px */
 }
 
 .search-container {
     margin-bottom: 30px;
+    /* 调整搜索框的 margin-top，避免与右上角按钮重叠 */
+    margin-top: 80px; /* 增加 margin-top 以适应按钮和间距 */
 }
 
 .search-container form {
@@ -189,6 +231,7 @@ body {
     display: flex;
     align-items: center;
     user-select: none;
+    font-size: 1em;
 }
 
 .category-title::before {
@@ -249,12 +292,18 @@ body {
     background-color: rgba(44, 62, 80, 0.8);
     color: white;
     border: none;
-    padding: 4px 8px;
-    border-radius: 4px;
+    border-radius: 5px;
     cursor: pointer;
     opacity: 0;
-    transition: opacity 0.2s ease;
-    font-size: 12px;
+    transition: opacity 0.2s ease, background-color 0.2s ease;
+    
+    width: 28px;
+    height: 28px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 16px;
+    padding: 0;
 }
 
 .bookmark-item:hover .edit-btn,
@@ -263,17 +312,25 @@ body {
 }
 
 .bookmark-item .edit-btn {
-    right: 55px;
+    right: 40px;
+}
+.bookmark-item .edit-btn:hover {
+    background-color: var(--secondary-color);
 }
 
 .bookmark-item .delete-btn {
-    right: 10px;
+    right: 5px;
     background-color: rgba(231, 76, 60, 0.8);
+}
+.bookmark-item .delete-btn:hover {
+    background-color: var(--danger-color);
 }
 
 .sortable-ghost {
     opacity: 0.4;
     background: #c8ebfb;
+    border: 1px dashed var(--primary-color);
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
 }
 
 .empty-message {
